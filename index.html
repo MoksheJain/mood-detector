@@ -1,308 +1,284 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>AI Mood Gardener 🌱</title>
+<head>
+  <meta charset="UTF-8">
+  <title>AI Mood Gardener 🌱</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- face-api -->
-    <script
-      defer
-      src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"
-    ></script>
+  <!-- face-api -->
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <style>
-      body {
-        font-family: Arial;
-        text-align: center;
-        background: #f0f8f5;
-      }
-      video {
-        border-radius: 10px;
-        margin-top: 10px;
-      }
-      #result {
-        font-size: 22px;
-        margin-top: 15px;
-        font-weight: bold;
-      }
-      #tips {
-        margin-top: 10px;
-        font-size: 18px;
-      }
-      canvas {
-        margin-top: 20px;
-        max-width: 400px;
-      }
-      /* Container to center content nicely on phones */
-      .container {
-        max-width: 700px;
-        margin: auto;
-        padding: 10px;
-      }
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: Arial;
+      background: #f0f8f5;
+    }
 
-      /* Make video fill width */
-      #video {
-        width: 100%;
-        height: auto;
-        aspect-ratio: 4 / 3; /* keeps shape consistent */
-        object-fit: cover; /* fills frame nicely */
-        border-radius: 16px;
-        margin-top: 10px;
-        background: black;
-      }
+    body {
+      display: flex;
+      flex-direction: column;
+    }
 
-      /* Bigger text for mobile */
-      #result {
-        font-size: 24px;
-        margin-top: 15px;
-        font-weight: bold;
-      }
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 10px;
+      box-sizing: border-box;
+    }
 
-      #tips {
-        font-size: 18px;
-        margin-top: 10px;
-        padding: 0 10px;
-      }
+    h2 {
+      margin: 5px 0;
+      text-align: center;
+    }
 
-      /* Chart also responsive */
-      canvas {
-        width: 100% !important;
-        max-width: 100%;
-        margin-top: 20px;
-      }
-    </style>
-  </head>
+    .camera-section {
+      flex: 3;
+      position: relative;
+    }
 
-  <body>
-    <div class="container">
-      <h1>🌱 AI Mood Gardener</h1>
-      <p>Show your face to detect mood</p>
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 16px;
+      background: black;
+    }
 
-      <video id="video" autoplay muted playsinline></video>
-      <div id="result">Loading AI...</div>
-      <div id="tips"></div>
+    #emoji-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
 
-      <canvas id="chart"></canvas>
-    </div>
+    .emoji {
+      position: absolute;
+      font-size: 28px;
+      animation: floatUp 2s ease-out forwards;
+    }
 
-    <script>
-      const video = document.getElementById("video");
-      const resultText = document.getElementById("result");
-      const tipsText = document.getElementById("tips");
+    @keyframes floatUp {
+      0% { transform: translateY(0); opacity: 1; }
+      100% { transform: translateY(-120px); opacity: 0; }
+    }
 
-      // ================== CONFIG ==================
-      let lastEmotion = null;
-      let lastUpdateTime = 0;
-      const UPDATE_INTERVAL = 3000;
-      const CONFIDENCE_THRESHOLD = 0.6;
+    .info-section {
+      flex: 1;
+      text-align: center;
+      padding: 5px;
+    }
 
-      // ================== DATA ==================
-      const moodData = {
-        happy: {
-          label: "Happy 😊",
-          activities: [
-            "Tell a joke 😄",
-            "Clap game 👏",
-            "Dance 💃",
-            "Say something nice 🤝",
-          ],
-          tips: [
-            "Water plant 💧",
-            "Give sunlight ☀️",
-            "Talk to plant 🌿",
-            "Play music 🎵",
-          ],
-        },
-        neutral: {
-          label: "Normal 😐",
-          activities: [
-            "Clap game 👏",
-            "Deep breathing 🌬️",
-            "Stretch 🧘",
-            "Count numbers 🔢",
-          ],
-          tips: [
-            "Keep near window 🪟",
-            "Check soil 🌱",
-            "Rotate plant 🔄",
-            "Clean leaves 🍃",
-          ],
-        },
-        sad: {
-          label: "Tired 😴",
-          activities: [
-            "Stretch 🧘",
-            "Jump 10 times 🏃",
-            "Drink water 💧",
-            "Smile 😊",
-          ],
-          tips: [
-            "Fresh air 🌿",
-            "Morning sunlight ☀️",
-            "Less water 🚫💧",
-            "Rest in shade 🌤️",
-          ],
-        },
-        angry: {
-          label: "Low Mood 😕",
-          activities: [
-            "Deep breaths 😤",
-            "Count to 10 🔢",
-            "Relax fists ✊",
-            "Close eyes 👀",
-          ],
-          tips: [
-            "Calm place 🌱",
-            "Water gently 💧",
-            "Check soil 🌿",
-            "Don’t disturb 🚫",
-          ],
-        },
-        surprised: {
-          label: "Excited 😲",
-          activities: [
-            "Say WOW 😲",
-            "Quick quiz ❓",
-            "Clap fast 👏",
-            "Spin 🌀",
-          ],
-          tips: [
-            "Light water 💧",
-            "Bright light ☀️",
-            "Observe leaves 👀",
-            "Rotate pot 🔄",
-          ],
-        },
-        fearful: {
-          label: "Tired 😴",
-          activities: [
-            "Sit calm 🧘",
-            "Hold hands 🤝",
-            "Deep breathing 🌬️",
-            "Look around 👀",
-          ],
-          tips: [
-            "Safe place 🏡",
-            "Avoid wind 🌬️",
-            "Gentle care 🌱",
-            "Check leaves 🍃",
-          ],
-        },
-        disgusted: {
-          label: "Low Mood 😕",
-          activities: [
-            "Wash hands 🧼",
-            "Fresh air 🌬️",
-            "Drink water 💧",
-            "Smile 😊",
-          ],
-          tips: [
-            "Clean leaves 🍃",
-            "Remove dry leaves ✂️",
-            "Clean area 🧹",
-            "Fresh water 💧",
-          ],
-        },
-      };
+    #result {
+      font-size: 22px;
+      font-weight: bold;
+    }
 
-      // ================== UTIL ==================
-      function getRandom(arr) {
-        return arr[Math.floor(Math.random() * arr.length)];
-      }
+    #tips {
+      font-size: 16px;
+      margin-top: 5px;
+    }
 
-      // ================== CHART ==================
-      const ctx = document.getElementById("chart").getContext("2d");
+    .chart-section {
+      flex: 2;
+    }
 
-      const moodHistory = [];
-      const chart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: [],
-          datasets: [
-            {
-              label: "Mood History",
-              data: [],
-              fill: false,
-            },
-          ],
-        },
-      });
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+  </style>
+</head>
 
-      // map mood to number for graph
-      function moodToValue(mood) {
-        if (mood.includes("Happy")) return 3;
-        if (mood.includes("Normal")) return 2;
-        return 1;
-      }
+<body>
 
-      // ================== MAIN ==================
-      async function start() {
-        await faceapi.nets.tinyFaceDetector.loadFromUri("./models");
-        await faceapi.nets.faceExpressionNet.loadFromUri("./models");
+<div class="app">
 
-        resultText.innerText = "Ready! Show your face 👇";
+  <h2>🌱 AI Mood Gardener</h2>
 
-        navigator.mediaDevices
-          .getUserMedia({ video: true })
-          .then((stream) => (video.srcObject = stream));
+  <div class="camera-section">
+    <video id="video" autoplay muted playsinline></video>
+    <div id="emoji-container"></div>
+  </div>
 
-        video.addEventListener("play", () => {
-          setInterval(async () => {
-            const detection = await faceapi
-              .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
-              .withFaceExpressions();
+  <div class="info-section">
+    <div id="result">Loading AI...</div>
+    <div id="tips"></div>
+  </div>
 
-            if (!detection) return;
+  <div class="chart-section">
+    <canvas id="chart"></canvas>
+  </div>
 
-            const exp = detection.expressions;
+</div>
 
-            const sorted = Object.entries(exp).sort((a, b) => b[1] - a[1]);
+<script>
+const video = document.getElementById('video');
+const resultText = document.getElementById('result');
+const tipsText = document.getElementById('tips');
 
-            const topEmotion = sorted[0][0];
-            const confidence = sorted[0][1];
+// ===== CONFIG =====
+let lastEmotion = null;
+let lastUpdateTime = 0;
+const UPDATE_INTERVAL = 3000;
+const CONFIDENCE_THRESHOLD = 0.6;
 
-            const now = Date.now();
+// ===== DATA =====
+const moodData = {
+  happy: {
+    label: "Happy 😊",
+    activities: ["Tell a joke 😄","Dance 💃","Clap game 👏","Say something nice 🤝"],
+    tips: ["Water plant 💧","Give sunlight ☀️","Talk to plant 🌿"]
+  },
+  neutral: {
+    label: "Normal 😐",
+    activities: ["Clap game 👏","Deep breathing 🌬️","Stretch 🧘"],
+    tips: ["Keep near window 🪟","Rotate plant 🔄","Clean leaves 🍃"]
+  },
+  sad: {
+    label: "Tired 😴",
+    activities: ["Stretch 🧘","Drink water 💧","Jump 🏃"],
+    tips: ["Fresh air 🌿","Morning sunlight ☀️"]
+  },
+  angry: {
+    label: "Low Mood 😕",
+    activities: ["Deep breath 😤","Count to 10 🔢"],
+    tips: ["Keep calm place 🌱","Water gently 💧"]
+  },
+  surprised: {
+    label: "Excited 😲",
+    activities: ["Say WOW 😲","Clap fast 👏"],
+    tips: ["Bright light ☀️","Observe leaves 👀"]
+  }
+};
 
-            if (
-              confidence > CONFIDENCE_THRESHOLD &&
-              topEmotion !== lastEmotion &&
-              now - lastUpdateTime > UPDATE_INTERVAL
-            ) {
-              lastEmotion = topEmotion;
-              lastUpdateTime = now;
+// ===== UTIL =====
+function getRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
 
-              const data = moodData[topEmotion] || moodData["neutral"];
+// ===== EMOJIS =====
+function showEmojis(mood) {
+  const container = document.getElementById("emoji-container");
 
-              const mood = data.label;
-              const activity = getRandom(data.activities);
-              const tip = getRandom(data.tips);
+  const emojiMap = {
+    "Happy 😊": ["😄","🎉","✨"],
+    "Normal 😐": ["🙂","🌿"],
+    "Tired 😴": ["😴","💤"],
+    "Low Mood 😕": ["😕","😞"],
+    "Excited 😲": ["😲","🔥"]
+  };
 
-              resultText.innerText = `Mood: ${mood} (${(
-                confidence * 100
-              ).toFixed(0)}%)`;
-              tipsText.innerText = `Activity: ${activity} | Plant Tip: ${tip}`;
+  const emojis = emojiMap[mood] || ["🙂"];
 
-              // update chart
-              const time = new Date().toLocaleTimeString();
+  for (let i = 0; i < 5; i++) {
+    const el = document.createElement("div");
+    el.className = "emoji";
+    el.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+    el.style.left = Math.random() * 90 + "%";
+    el.style.top = Math.random() * 70 + "%";
+    container.appendChild(el);
 
-              chart.data.labels.push(time);
-              chart.data.datasets[0].data.push(moodToValue(mood));
+    setTimeout(() => el.remove(), 2000);
+  }
+}
 
-              if (chart.data.labels.length > 10) {
-                chart.data.labels.shift();
-                chart.data.datasets[0].data.shift();
-              }
+// ===== CHART =====
+const ctx = document.getElementById('chart').getContext('2d');
 
-              chart.update();
-            }
-          }, 1000);
-        });
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      label: 'Mood',
+      data: [],
+      fill: false
+    }]
+  }
+});
+
+function moodToValue(mood) {
+  if (mood.includes("Happy")) return 3;
+  if (mood.includes("Normal")) return 2;
+  return 1;
+}
+
+// ===== MAIN =====
+async function start() {
+
+  await faceapi.nets.tinyFaceDetector.loadFromUri('./models');
+  await faceapi.nets.faceExpressionNet.loadFromUri('./models');
+
+  resultText.innerText = "Ready! Show your face 👇";
+
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user" }
+  }).then(stream => video.srcObject = stream);
+
+  video.addEventListener('play', () => {
+
+    setInterval(async () => {
+
+      const detection = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceExpressions();
+
+      if (!detection) return;
+
+      const exp = detection.expressions;
+
+      const sorted = Object.entries(exp)
+        .sort((a, b) => b[1] - a[1]);
+
+      const topEmotion = sorted[0][0];
+      const confidence = sorted[0][1];
+      const now = Date.now();
+
+      if (
+        confidence > CONFIDENCE_THRESHOLD &&
+        topEmotion !== lastEmotion &&
+        (now - lastUpdateTime > UPDATE_INTERVAL)
+      ) {
+        lastEmotion = topEmotion;
+        lastUpdateTime = now;
+
+        const data = moodData[topEmotion] || moodData["neutral"];
+        const mood = data.label;
+        const activity = getRandom(data.activities);
+        const tip = getRandom(data.tips);
+
+        resultText.innerText = `Mood: ${mood}`;
+        tipsText.innerText = `${activity} | ${tip}`;
+
+        showEmojis(mood);
+
+        const time = new Date().toLocaleTimeString();
+        chart.data.labels.push(time);
+        chart.data.datasets[0].data.push(moodToValue(mood));
+
+        if (chart.data.labels.length > 10) {
+          chart.data.labels.shift();
+          chart.data.datasets[0].data.shift();
+        }
+
+        chart.update();
       }
 
-      window.addEventListener("load", start);
-    </script>
-  </body>
+    }, 1000);
+
+  });
+}
+
+window.addEventListener('load', start);
+</script>
+
+</body>
 </html>
