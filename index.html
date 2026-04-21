@@ -1,133 +1,212 @@
 <!DOCTYPE html>
-
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>AI Mood Gardener 🌱</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<title>AI Mood Gardener 🌱</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- face-api -->
+<script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<style>
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: Arial;
+  background: #f0f8f5;
+}
 
-  <!-- Chart.js -->
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+/* TABS */
+.tabs {
+  display: flex;
+  background: #dff5ea;
+}
 
-  <style>
-    html, body {
-      margin: 0;
-      height: 100%;
-      font-family: Arial;
-      background: #f0f8f5;
-    }
+.tab {
+  flex: 1;
+  padding: 12px;
+  text-align: center;
+  cursor: pointer;
+  font-weight: bold;
+}
 
-    .app {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      padding: 10px;
-      box-sizing: border-box;
-    }
+.tab.active {
+  background: #b2f2d7;
+}
 
-    h2 {
-      text-align: center;
-      margin: 5px;
-    }
+/* SECTIONS */
+.section {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+}
 
-    .camera-section {
-      flex: 3;
-      position: relative;
-    }
+.section.active {
+  display: flex;
+}
 
-    #video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 16px;
-      background: black;
-    }
+/* CAMERA */
+.camera-section {
+  flex: 3;
+  position: relative;
+}
 
-    #emoji-container {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
+#video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 16px;
+  background: black;
+}
 
-    .emoji {
-      position: absolute;
-      font-size: 28px;
-      animation: floatUp 2s ease-out forwards;
-    }
+/* INFO */
+.info {
+  text-align: center;
+  padding: 10px;
+}
 
-    @keyframes floatUp {
-      0% { transform: translateY(0); opacity: 1; }
-      100% { transform: translateY(-120px); opacity: 0; }
-    }
+.chart-section {
+  flex: 2;
+}
 
-    .info {
-      text-align: center;
-      padding: 10px;
-    }
+/* GAME */
+#gameArea {
+  position: relative;
+  flex: 1;
+  background: white;
+  overflow: hidden;
+}
 
-    #result {
-      font-size: 22px;
-      font-weight: bold;
-    }
+.star {
+  position: absolute;
+  font-size: 30px;
+  cursor: pointer;
+}
 
-    #count {
-      font-size: 18px;
-      margin-top: 5px;
-    }
-
-    #classMood {
-      font-size: 20px;
-      margin-top: 5px;
-    }
-
-    #activity {
-      font-size: 18px;
-      margin-top: 5px;
-    }
-
-    .chart-section {
-      flex: 2;
-    }
-
-    canvas {
-      width: 100% !important;
-      height: 100% !important;
-    }
-  </style>
-
+#gameInfo {
+  text-align: center;
+  padding: 10px;
+  font-size: 18px;
+}
+</style>
 </head>
 
 <body>
 
 <div class="app">
 
-  <h2>🌱 AI Mood Gardener (Live Class)</h2>
-
-  <div class="camera-section">
-    <video id="video" autoplay muted playsinline></video>
-    <div id="emoji-container"></div>
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab(event, 'mood')">🌱 Mood</div>
+    <div class="tab" onclick="switchTab(event, 'game')">🎮 Game</div>
   </div>
 
-  <div class="info">
-    <div id="result">Loading AI...</div>
-    <div id="count">Students detected: 0</div>
-    <div id="classMood"></div>
-    <div id="activity"></div>
+  <!-- MOOD -->
+  <div id="mood" class="section active">
+
+    <h2 style="text-align:center;">AI Mood Gardener 🌱</h2>
+
+    <div class="camera-section">
+      <video id="video" autoplay muted playsinline></video>
+    </div>
+
+    <div class="info">
+      <div id="result">Loading AI...</div>
+      <div id="count">Students detected: 0</div>
+      <div id="classMood"></div>
+      <div id="activity"></div>
+    </div>
+
+    <div class="chart-section">
+      <canvas id="chart"></canvas>
+    </div>
+
   </div>
 
-  <div class="chart-section">
-    <canvas id="chart"></canvas>
+  <!-- GAME -->
+  <div id="game" class="section">
+
+    <h2 style="text-align:center;">🎮 Catch the Star</h2>
+
+    <div id="gameInfo">
+      Score: <span id="score">0</span> |
+      Time: <span id="time">30</span>s
+    </div>
+
+    <div id="gameArea"></div>
+
   </div>
 
 </div>
 
 <script>
+
+/* TAB SWITCH */
+function switchTab(e, id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+
+  e.target.classList.add('active');
+  document.getElementById(id).classList.add('active');
+
+  if (id === 'game') startGame();
+}
+
+/* ================= GAME ================= */
+let score = 0;
+let timeLeft = 30;
+let gameInterval;
+
+function startGame() {
+  clearInterval(gameInterval);
+
+  score = 0;
+  timeLeft = 30;
+
+  document.getElementById("score").innerText = score;
+  document.getElementById("time").innerText = timeLeft;
+
+  gameInterval = setInterval(() => {
+    timeLeft--;
+    document.getElementById("time").innerText = timeLeft;
+
+    spawnStar();
+
+    if (timeLeft <= 0) {
+      clearInterval(gameInterval);
+      alert("Game Over! Score: " + score);
+    }
+  }, 1000);
+}
+
+function spawnStar() {
+  const star = document.createElement("div");
+  star.className = "star";
+  star.innerText = "⭐";
+
+  const area = document.getElementById("gameArea");
+
+  star.style.left = Math.random() * 90 + "%";
+  star.style.top = Math.random() * 80 + "%";
+
+  star.onclick = () => {
+    score++;
+    document.getElementById("score").innerText = score;
+    star.remove();
+  };
+
+  area.appendChild(star);
+  setTimeout(() => star.remove(), 1500);
+}
+
+/* ================= MOOD AI ================= */
+
 const video = document.getElementById('video');
 const resultText = document.getElementById('result');
 const classMoodDiv = document.getElementById('classMood');
@@ -137,7 +216,6 @@ const countText = document.getElementById('count');
 let moodHistory = [];
 const MAX_HISTORY = 30;
 
-// ===== ACTIVITIES =====
 const activities = [
   "🎵 Dance break!",
   "👏 Clap game!",
@@ -146,32 +224,13 @@ const activities = [
   "⚡ Jumping jacks"
 ];
 
-// ===== CHART =====
 const chart = new Chart(document.getElementById('chart'), {
   type: 'pie',
   data: {
-    labels: ["Happy 😊","Neutral 😐","Sad 😴","Angry 😕","Excited 😲"],
-    datasets: [{
-      data: [0,0,0,0,0]
-    }]
+    labels: ["Happy 😊","Neutral 😐","Sad 😴","Angry 😕","Surprised 😲"],
+    datasets: [{ data: [0,0,0,0,0] }]
   }
 });
-
-// ===== UTILS =====
-function showEmojis() {
-  const container = document.getElementById("emoji-container");
-  const emojis = ["😄","🎉","✨"];
-
-  for (let i = 0; i < 5; i++) {
-    const el = document.createElement("div");
-    el.className = "emoji";
-    el.innerText = emojis[Math.floor(Math.random() * emojis.length)];
-    el.style.left = Math.random() * 90 + "%";
-    el.style.top = Math.random() * 70 + "%";
-    container.appendChild(el);
-    setTimeout(() => el.remove(), 2000);
-  }
-}
 
 function getPercentages() {
   let counts = { happy:0, neutral:0, sad:0, angry:0, surprised:0 };
@@ -191,20 +250,15 @@ function getPercentages() {
 
 function updateChart(p) {
   chart.data.datasets[0].data = [
-    p.happy,
-    p.neutral,
-    p.sad,
-    p.angry,
-    p.surprised
+    p.happy, p.neutral, p.sad, p.angry, p.surprised
   ];
   chart.update();
 }
 
 function getOverallMood(p) {
-  const score = p.happy;
-  if (score >= 60) return `😊 Happy Class (${score}%)`;
-  if (score >= 40) return `😐 Neutral Class (${score}%)`;
-  return `😕 Not Happy Class (${score}%)`;
+  if (p.happy >= 60) return "😊 Happy Class";
+  if (p.happy >= 40) return "😐 Neutral Class";
+  return "😕 Not Happy Class";
 }
 
 function getActivity(p) {
@@ -214,57 +268,68 @@ function getActivity(p) {
   return activities[Math.floor(Math.random() * activities.length)];
 }
 
-// ===== MAIN =====
-async function start() {
+async function startAI() {
 
-  await faceapi.nets.tinyFaceDetector.loadFromUri('./models');
-  await faceapi.nets.faceExpressionNet.loadFromUri('./models');
+  try {
+    resultText.innerText = "Loading AI models...";
 
-  resultText.innerText = "Ready! Show faces 👇";
+    await faceapi.nets.tinyFaceDetector.loadFromUri(
+      'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'
+    );
+    await faceapi.nets.faceExpressionNet.loadFromUri(
+      'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'
+    );
 
-  navigator.mediaDevices.getUserMedia({ video: true })
-    .then(stream => video.srcObject = stream);
+    resultText.innerText = "Starting camera...";
 
-  video.addEventListener('play', () => {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
 
-    setInterval(async () => {
+    video.addEventListener('play', () => {
 
-      const detections = await faceapi
-        .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
-        .withFaceExpressions();
+      resultText.innerText = "AI Ready! 😊";
 
-      if (!detections.length) return;
+      setInterval(async () => {
 
-      // ===== LIVE STUDENT COUNT =====
-      countText.innerText = `Students detected: ${detections.length}`;
+        const detections = await faceapi
+          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+          .withFaceExpressions();
 
-      detections.forEach(det => {
-        const exp = det.expressions;
-        const sorted = Object.entries(exp).sort((a,b)=>b[1]-a[1]);
-        const emotion = sorted[0][0];
+        if (!detections.length) return;
 
-        moodHistory.push(emotion);
-      });
+        countText.innerText = "Students detected: " + detections.length;
 
-      if (moodHistory.length > MAX_HISTORY) {
-        moodHistory.splice(0, moodHistory.length - MAX_HISTORY);
-      }
+        detections.forEach(det => {
+          const emotion = Object.entries(det.expressions)
+            .sort((a,b)=>b[1]-a[1])[0][0];
 
-      const p = getPercentages();
+          moodHistory.push(emotion);
+        });
 
-      resultText.innerText = "Analyzing class...";
-      classMoodDiv.innerText = "Class Mood: " + getOverallMood(p);
-      activityText.innerText = getActivity(p);
+        if (moodHistory.length > MAX_HISTORY) {
+          moodHistory.splice(0, moodHistory.length - MAX_HISTORY);
+        }
 
-      updateChart(p);
-      showEmojis();
+        const p = getPercentages();
 
-    }, 1500);
+        classMoodDiv.innerText = "Class Mood: " + getOverallMood(p);
+        activityText.innerText = getActivity(p);
 
-  });
+        updateChart(p);
+
+      }, 1500);
+
+    });
+
+  } catch (err) {
+    resultText.innerText = "❌ Error loading AI";
+    console.error(err);
+    alert("Make sure you're using Live Server or HTTPS!");
+  }
 }
 
-window.addEventListener('load', start);
+window.onload = startAI;
+
 </script>
 
 </body>
