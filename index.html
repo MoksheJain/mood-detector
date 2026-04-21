@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>AI Mood Gardener 🌱</title>
+
+  <!-- face-api -->
+  <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      background: #f0f8f5;
+    }
+    video {
+      border-radius: 10px;
+      margin-top: 10px;
+    }
+    #result {
+      font-size: 22px;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    #tips {
+      margin-top: 10px;
+      font-size: 18px;
+    }
+    canvas {
+      margin-top: 20px;
+      max-width: 400px;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>🌱 AI Mood Gardener</h1>
+<p>Show your face to detect mood</p>
+
+<video id="video" width="400" height="300" autoplay muted></video>
+
+<div id="result">Loading AI...</div>
+<div id="tips"></div>
+
+<canvas id="chart"></canvas>
+
+<script>
+const video = document.getElementById('video');
+const resultText = document.getElementById('result');
+const tipsText = document.getElementById('tips');
+
+// ================== CONFIG ==================
+let lastEmotion = null;
+let lastUpdateTime = 0;
+const UPDATE_INTERVAL = 3000;
+const CONFIDENCE_THRESHOLD = 0.6;
+
+// ================== DATA ==================
+const moodData = {
+  happy: {
+    label: "Happy 😊",
+    activities: ["Tell a joke 😄","Clap game 👏","Dance 💃","Say something nice 🤝"],
+    tips: ["Water plant 💧","Give sunlight ☀️","Talk to plant 🌿","Play music 🎵"]
+  },
+  neutral: {
+    label: "Normal 😐",
+    activities: ["Clap game 👏","Deep breathing 🌬️","Stretch 🧘","Count numbers 🔢"],
+    tips: ["Keep near window 🪟","Check soil 🌱","Rotate plant 🔄","Clean leaves 🍃"]
+  },
+  sad: {
+    label: "Tired 😴",
+    activities: ["Stretch 🧘","Jump 10 times 🏃","Drink water 💧","Smile 😊"],
+    tips: ["Fresh air 🌿","Morning sunlight ☀️","Less water 🚫💧","Rest in shade 🌤️"]
+  },
+  angry: {
+    label: "Low Mood 😕",
+    activities: ["Deep breaths 😤","Count to 10 🔢","Relax fists ✊","Close eyes 👀"],
+    tips: ["Calm place 🌱","Water gently 💧","Check soil 🌿","Don’t disturb 🚫"]
+  },
+  surprised: {
+    label: "Excited 😲",
+    activities: ["Say WOW 😲","Quick quiz ❓","Clap fast 👏","Spin 🌀"],
+    tips: ["Light water 💧","Bright light ☀️","Observe leaves 👀","Rotate pot 🔄"]
+  },
+  fearful: {
+    label: "Tired 😴",
+    activities: ["Sit calm 🧘","Hold hands 🤝","Deep breathing 🌬️","Look around 👀"],
+    tips: ["Safe place 🏡","Avoid wind 🌬️","Gentle care 🌱","Check leaves 🍃"]
+  },
+  disgusted: {
+    label: "Low Mood 😕",
+    activities: ["Wash hands 🧼","Fresh air 🌬️","Drink water 💧","Smile 😊"],
+    tips: ["Clean leaves 🍃","Remove dry leaves ✂️","Clean area 🧹","Fresh water 💧"]
+  }
+};
+
+// ================== UTIL ==================
+function getRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// ================== CHART ==================
+const ctx = document.getElementById('chart').getContext('2d');
+
+const moodHistory = [];
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      label: 'Mood History',
+      data: [],
+      fill: false
+    }]
+  }
+});
+
+// map mood to number for graph
+function moodToValue(mood) {
+  if (mood.includes("Happy")) return 3;
+  if (mood.includes("Normal")) return 2;
+  return 1;
+}
+
+// ================== MAIN ==================
+async function start() {
+
+  await faceapi.nets.tinyFaceDetector.loadFromUri('./models');
+  await faceapi.nets.faceExpressionNet.loadFromUri('./models');
+
+  resultText.innerText = "Ready! Show your face 👇";
+
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => video.srcObject = stream);
+
+  video.addEventListener('play', () => {
+
+    setInterval(async () => {
+
+      const detection = await faceapi
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceExpressions();
+
+      if (!detection) return;
+
+      const exp = detection.expressions;
+
+      const sorted = Object.entries(exp)
+        .sort((a, b) => b[1] - a[1]);
+
+      const topEmotion = sorted[0][0];
+      const confidence = sorted[0][1];
+
+      const now = Date.now();
+
+      if (
+        confidence > CONFIDENCE_THRESHOLD &&
+        topEmotion !== lastEmotion &&
+        (now - lastUpdateTime > UPDATE_INTERVAL)
+      ) {
+        lastEmotion = topEmotion;
+        lastUpdateTime = now;
+
+        const data = moodData[topEmotion] || moodData["neutral"];
+
+        const mood = data.label;
+        const activity = getRandom(data.activities);
+        const tip = getRandom(data.tips);
+
+        resultText.innerText = `Mood: ${mood} (${(confidence*100).toFixed(0)}%)`;
+        tipsText.innerText = `Activity: ${activity} | Plant Tip: ${tip}`;
+
+        // update chart
+        const time = new Date().toLocaleTimeString();
+
+        chart.data.labels.push(time);
+        chart.data.datasets[0].data.push(moodToValue(mood));
+
+        if (chart.data.labels.length > 10) {
+          chart.data.labels.shift();
+          chart.data.datasets[0].data.shift();
+        }
+
+        chart.update();
+      }
+
+    }, 1000);
+
+  });
+}
+
+window.addEventListener('load', start);
+
+</script>
+
+</body>
+</html>
