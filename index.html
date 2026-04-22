@@ -71,6 +71,13 @@ html, body {
   padding: 10px;
 }
 
+#plantTip {
+  font-size: 18px;
+  margin-top: 5px;
+  color: green;
+  font-weight: bold;
+}
+
 .chart-section {
   flex: 2;
 }
@@ -107,7 +114,7 @@ html, body {
     <div class="tab" onclick="switchTab(event, 'game')">🎮 Game</div>
   </div>
 
-  <!-- MOOD -->
+  <!-- MOOD SECTION -->
   <div id="mood" class="section active">
 
     <h2 style="text-align:center;">AI Mood Gardener 🌱</h2>
@@ -121,6 +128,7 @@ html, body {
       <div id="count">Students detected: 0</div>
       <div id="classMood"></div>
       <div id="activity"></div>
+      <div id="plantTip"></div>
     </div>
 
     <div class="chart-section">
@@ -129,7 +137,7 @@ html, body {
 
   </div>
 
-  <!-- GAME -->
+  <!-- GAME SECTION -->
   <div id="game" class="section">
 
     <h2 style="text-align:center;">🎮 Catch the Star</h2>
@@ -212,6 +220,7 @@ const resultText = document.getElementById('result');
 const classMoodDiv = document.getElementById('classMood');
 const activityText = document.getElementById('activity');
 const countText = document.getElementById('count');
+const plantTipDiv = document.getElementById('plantTip');
 
 let moodHistory = [];
 const MAX_HISTORY = 30;
@@ -268,6 +277,13 @@ function getActivity(p) {
   return activities[Math.floor(Math.random() * activities.length)];
 }
 
+function getPlantTip(p) {
+  if (p.happy > 60) return "🌱 Plants are thriving! Keep smiling!";
+  if (p.sad > 40) return "🌿 Give plants more sunlight and water!";
+  if (p.angry > 30) return "🍃 Calm environment helps plants grow!";
+  return "🌼 Keep watering and stay positive!";
+}
+
 async function startAI() {
 
   try {
@@ -314,6 +330,7 @@ async function startAI() {
 
         classMoodDiv.innerText = "Class Mood: " + getOverallMood(p);
         activityText.innerText = getActivity(p);
+        plantTipDiv.innerText = getPlantTip(p);
 
         updateChart(p);
 
@@ -324,7 +341,7 @@ async function startAI() {
   } catch (err) {
     resultText.innerText = "❌ Error loading AI";
     console.error(err);
-    alert("Make sure you're using Live Server or HTTPS!");
+    alert("Run using Live Server or allow camera permissions!");
   }
 }
 
